@@ -320,10 +320,11 @@ function checkLicense() {
 }
 
 function validateKeyFormat(key) {
-  // Accept any key that starts with LR-PRO- and has at least 20 characters
-  if (!key || key.length < 20) return false;
-  if (!key.startsWith('LR-PRO-')) return false;
-  return true;
+  // Accept UUID format from LemonSqueezy (e.g., 09EEECB4-FF28-4E0D-A235-ED5F6C3D46A2)
+  // UUID format: 8-4-4-4-12 hex characters
+  if (!key) return false;
+  const uuidRegex = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i;
+  return uuidRegex.test(key.trim());
 }
 
 function activateLicense() {
