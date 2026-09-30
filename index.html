@@ -343,14 +343,7 @@ function activateLicense() {
   }
 }
 
-function resetLicense() {
-  localStorage.removeItem('redactlocal_license');
-  state.isPro = false;
-  document.getElementById('proStatus').classList.add('hidden');
-  document.getElementById('proStatus').classList.remove('flex');
-  updateProUI();
-  alert('✅ License reset. You are now on the free plan.');
-}
+
 
 function updateProUI() {
   if (state.isPro) {
