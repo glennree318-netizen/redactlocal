@@ -311,11 +311,24 @@ const state = {
 // ============================================================
 function checkLicense() {
   const key = localStorage.getItem('redactlocal_license');
-  if (key && validateKeyFormat(key)) {
+  console.log('License check - Key found:', key);
+  
+  if (key && key.trim().length >= 10) {
+    console.log('License valid, activating Pro');
     state.isPro = true;
-    document.getElementById('proStatus').classList.remove('hidden');
-    document.getElementById('proStatus').classList.add('flex');
+    
+    // Make sure DOM elements exist before modifying them
+    const proStatus = document.getElementById('proStatus');
+    if (proStatus) {
+      proStatus.classList.remove('hidden');
+      proStatus.classList.add('flex');
+      console.log('Pro badge shown');
+    }
+    
     updateProUI();
+    console.log('Pro UI updated');
+  } else {
+    console.log('No valid license found');
   }
 }
 
@@ -1400,7 +1413,11 @@ resetBtn.addEventListener('click', resetApp);
 // ============================================================
 // INIT
 // ============================================================
-checkLicense();
+// Wait for DOM to be fully loaded before checking license
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('DOM loaded, checking license...');
+  checkLicense();
+});
 </script>
 </body>
 </html>
