@@ -1,0 +1,1410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RedactLocal — Free Online PDF & Image Redactor | Zero-Trust PII Protection</title>
+<meta name="description" content="Automatically redact sensitive information (SSN, email, phone, credit cards) from PDFs and images. 100% client-side, no uploads, no accounts. Free online PII redactor." />
+<meta name="keywords" content="redact PDF, remove SSN from PDF, black out text PDF, PII redactor, privacy, secure document redaction, free online redactor" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="RedactLocal — Zero-Trust PII Redactor" />
+<meta property="og:description" content="Automatically redact sensitive info from PDFs and images. 100% local, no uploads. Free." />
+<meta property="og:image" content="https://via.placeholder.com/1200x630/2563eb/ffffff?text=RedactLocal" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="RedactLocal — Zero-Trust PII Redactor" />
+<meta name="twitter:description" content="Automatically redact sensitive info from PDFs and images. 100% local, no uploads. Free." />
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  .drop-zone.dragover { border-color: #2563eb; background-color: #eff6ff; }
+  .severity-critical { background: #fee2e2; color: #991b1b; }
+  .severity-high { background: #fef3c7; color: #92400e; }
+  .severity-medium { background: #dbeafe; color: #1e40af; }
+  .severity-manual { background: #e0e7ff; color: #3730a3; }
+  .preview-container { max-height: 500px; overflow-y: auto; }
+  .loader { border: 3px solid #e5e7eb; border-top: 3px solid #2563eb; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  .redacted-notice { background: #fef3c7; border: 2px solid #f59e0b; color: #92400e; padding: 12px; border-radius: 8px; margin-bottom: 16px; font-weight: 600; }
+  .pro-badge { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #78350f; font-weight: 700; padding: 2px 8px; border-radius: 9999px; font-size: 10px; }
+  .tab-active { background: #2563eb; color: white; }
+  .tab-inactive { background: #f3f4f6; color: #374151; }
+  .limit-notice { background: #fef3c7; border: 2px solid #f59e0b; color: #92400e; padding: 16px; border-radius: 12px; margin-bottom: 16px; }
+  .feature-icon { width: 48px; height: 48px; background: #dbeafe; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+  .error-box { background: #fee2e2; border: 2px solid #dc2626; color: #991b1b; padding: 16px; border-radius: 12px; margin-bottom: 16px; }
+  .error-box h3 { font-weight: 700; margin-bottom: 8px; }
+  .error-box p { font-size: 14px; line-height: 1.5; }
+  .redact-btn-disabled { opacity: 0.5; cursor: not-allowed; }
+  .privacy-report { background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border: 2px solid #10b981; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .privacy-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; color: #065f46; }
+  .privacy-item::before { content: '✓'; font-weight: bold; color: #10b981; font-size: 16px; }
+  
+  /* Canvas container ensures overlay aligns perfectly with display canvas */
+  .canvas-wrapper {
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
+    line-height: 0; /* Remove inline spacing */
+  }
+  .canvas-wrapper canvas.display-canvas {
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
+  .canvas-wrapper canvas.draw-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+    touch-action: none; /* Prevent scrolling while drawing on mobile */
+  }
+</style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<!-- Header -->
+<header class="bg-white border-b border-gray-200">
+  <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">R</div>
+      <div>
+        <h1 class="text-xl font-bold text-gray-900">RedactLocal</h1>
+        <p class="text-xs text-gray-500">Zero-trust PII redactor</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <div id="proStatus" class="hidden items-center gap-2 bg-yellow-50 border border-yellow-300 rounded-full px-4 py-2">
+        <span class="text-yellow-600">⭐</span>
+        <span class="text-sm font-medium text-yellow-800">Pro Active</span>
+      </div>
+      <button id="settingsBtn" class="text-sm bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg">⚙️ Settings</button>
+      <div class="flex items-center gap-2 bg-green-50 border border-green-200 rounded-full px-4 py-2">
+        <span class="text-green-600">🔒</span>
+        <span class="text-sm font-medium text-green-800">100% local</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- Settings Modal -->
+<div id="settingsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl p-6 max-w-md w-full">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-bold">Settings</h2>
+      <button id="closeSettings" class="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+    </div>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-semibold mb-2">License Key</label>
+        <input id="licenseInput" type="text" placeholder="RL-PRO-XXXX-XXXX-XXXX" class="w-full border border-gray-300 rounded-lg px-3 py-2 font-mono text-sm" />
+        <p class="text-xs text-gray-500 mt-1">Enter your Pro license key to unlock all features.</p>
+      </div>
+      <button id="activateBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg">Activate</button>
+      <button id="resetLicenseBtn" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 rounded-lg text-sm">🔄 Reset License (for testing)</button>
+      <div class="border-t pt-4">
+        <p class="text-sm text-gray-600 mb-2">Don't have a license?</p>
+        <a id="buyLink" href="https://yourstore.lemonsqueezy.com/checkout/custom/xxxxx" target="_blank" class="block w-full bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white font-bold py-3 rounded-lg text-center">⭐ Upgrade to Pro — $19 one-time</a>
+        <p class="text-xs text-gray-500 mt-2 text-center">Unlimited pages, redactions, and advanced features</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<main class="max-w-6xl mx-auto px-6 py-8">
+
+  <!-- Hero Section -->
+  <div id="heroSection" class="text-center mb-12">
+    <h1 class="text-4xl font-bold text-gray-900 mb-4">Automatically Redact Sensitive Information</h1>
+    <p class="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">Find and permanently remove PII (SSN, email, phone, credit cards) from PDFs and images. 100% private — your files never leave your browser.</p>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto mb-8">
+      <div class="bg-white rounded-xl p-6 border border-gray-200">
+        <div class="feature-icon mx-auto mb-3">📄</div>
+        <h3 class="font-bold text-gray-900 mb-2">1. Upload</h3>
+        <p class="text-sm text-gray-600">Drop a PDF or image. We support all common formats.</p>
+      </div>
+      <div class="bg-white rounded-xl p-6 border border-gray-200">
+        <div class="feature-icon mx-auto mb-3">🔍</div>
+        <h3 class="font-bold text-gray-900 mb-2">2. Auto-Detect</h3>
+        <p class="text-sm text-gray-600">We automatically find SSNs, emails, phones, and more.</p>
+      </div>
+      <div class="bg-white rounded-xl p-6 border border-gray-200">
+        <div class="feature-icon mx-auto mb-3">🔒</div>
+        <h3 class="font-bold text-gray-900 mb-2">3. Redact & Download</h3>
+        <p class="text-sm text-gray-600">Review detections, redact with one click, download securely.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Drop Zone -->
+  <div id="dropZone" class="drop-zone border-2 border-dashed border-gray-300 rounded-2xl p-12 text-center bg-white hover:border-blue-400 transition cursor-pointer">
+    <div class="text-6xl mb-4">📄</div>
+    <h2 class="text-2xl font-bold text-gray-900 mb-2">Drop a PDF or image to redact</h2>
+    <p class="text-gray-600 mb-6">Supports PDF, PNG, JPG, WEBP. Max 50MB.</p>
+    <label class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg cursor-pointer transition">
+      Browse Files
+      <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.webp" class="hidden" />
+    </label>
+    <p class="text-xs text-gray-400 mt-6">Your files are processed entirely in your browser. No uploads. No accounts.</p>
+  </div>
+
+  <!-- Error State -->
+  <div id="errorState" class="hidden error-box">
+    <h3 id="errorTitle">❌ Error Processing File</h3>
+    <p id="errorMessage">Something went wrong. Please try again.</p>
+    <button id="errorResetBtn" class="mt-4 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg text-sm">Try Another File</button>
+  </div>
+
+  <!-- Processing State -->
+  <div id="processingState" class="hidden bg-white rounded-2xl p-12 text-center border border-gray-200">
+    <div class="loader mx-auto mb-4"></div>
+    <h3 id="processingText" class="text-lg font-semibold text-gray-900">Processing...</h3>
+    <p id="processingDetail" class="text-sm text-gray-500 mt-2">This may take a moment</p>
+    <div class="w-full bg-gray-200 rounded-full h-2 mt-6 max-w-md mx-auto">
+      <div id="progressBar" class="bg-blue-600 h-2 rounded-full transition-all" style="width: 0%"></div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="resultsState" class="hidden">
+    <div id="limitNotice" class="hidden limit-notice">
+      <div class="flex items-start gap-3">
+        <span class="text-2xl">⭐</span>
+        <div class="flex-1">
+          <h3 class="font-bold text-gray-900 mb-1">Free Tier Limit Reached</h3>
+          <p class="text-sm text-gray-700 mb-3">You've used your free allowance. Upgrade to Pro for unlimited access.</p>
+          <button class="open-settings bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white font-bold px-4 py-2 rounded-lg text-sm">Upgrade to Pro — $19 one-time</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Review Panel -->
+      <div class="lg:col-span-1 space-y-4">
+        <div class="bg-white rounded-2xl border border-gray-200 p-4">
+          <div class="flex gap-1 mb-4 bg-gray-100 rounded-lg p-1">
+            <button data-tab="auto" class="tab-btn tab-active flex-1 text-xs font-semibold py-2 rounded-md transition">🔍 Auto</button>
+            <button data-tab="keyword" class="tab-btn tab-inactive flex-1 text-xs font-semibold py-2 rounded-md transition">⌨️ Keyword <span class="pro-badge">PRO</span></button>
+            <button data-tab="draw" class="tab-btn tab-inactive flex-1 text-xs font-semibold py-2 rounded-md transition">✏️ Draw <span class="pro-badge">PRO</span></button>
+          </div>
+          <div id="tab-auto" class="tab-content">
+            <p class="text-xs text-gray-500 mb-3">Auto-detected PII from document text.</p>
+            <div class="flex gap-2 mb-3">
+              <button id="selectAllBtn" class="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded">Select all</button>
+              <button id="deselectAllBtn" class="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded">Deselect all</button>
+            </div>
+            <div id="reviewList" class="space-y-2 max-h-64 overflow-y-auto"></div>
+          </div>
+          <div id="tab-keyword" class="tab-content hidden">
+            <div id="keywordLocked" class="text-center py-6">
+              <div class="text-4xl mb-2">🔒</div>
+              <p class="text-sm text-gray-600 mb-3">Search for specific words or phrases to redact across the entire document.</p>
+              <button class="open-settings text-sm bg-gradient-to-r from-yellow-400 to-orange-500 text-white font-bold px-4 py-2 rounded-lg">Unlock with Pro</button>
+            </div>
+            <div id="keywordUnlocked" class="hidden">
+              <input id="keywordInput" type="text" placeholder="e.g., Acme Corp, John Smith" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-2" />
+              <button id="searchKeywordBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 rounded-lg">Search & Add to Redactions</button>
+              <p class="text-xs text-gray-500 mt-2">Tip: Use regex like <code>\b\d{5}\b</code> for patterns.</p>
+            </div>
+          </div>
+          <div id="tab-draw" class="tab-content hidden">
+            <div id="drawLocked" class="text-center py-6">
+              <div class="text-4xl mb-2">🔒</div>
+              <p class="text-sm text-gray-600 mb-3">Draw custom rectangles to redact areas that auto-detection missed.</p>
+              <button class="open-settings text-sm bg-gradient-to-r from-yellow-400 to-orange-500 text-white font-bold px-4 py-2 rounded-lg">Unlock with Pro</button>
+            </div>
+            <div id="drawUnlocked" class="hidden">
+              <p class="text-sm text-gray-600 mb-3">Click the "Draw Mode" button in the preview panel, then drag on the document to draw redaction boxes.</p>
+              <button id="toggleDrawMode" class="w-full bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold py-2 rounded-lg">✏️ Enable Draw Mode</button>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-200 p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-bold text-gray-900">Total Redactions</h3>
+            <span id="detectionCount" class="text-sm text-gray-500">0 items</span>
+          </div>
+          <button id="redactBtn" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 rounded-lg transition">🔒 Redact Selected Items</button>
+          <p id="redactStatus" class="text-xs text-green-600 mt-2 text-center hidden">✓ Redaction applied</p>
+        </div>
+      </div>
+
+      <!-- Preview -->
+      <div class="lg:col-span-2 bg-white rounded-2xl border border-gray-200 p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-bold text-gray-900">Preview</h3>
+          <div class="flex gap-2">
+            <button id="beforeBtn" class="text-sm bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1 rounded">Before</button>
+            <button id="afterBtn" class="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded">After</button>
+            <button id="drawModeBtn" class="hidden text-sm bg-purple-100 hover:bg-purple-200 text-purple-800 px-3 py-1 rounded">✏️ Draw Mode: OFF</button>
+          </div>
+        </div>
+        <div id="redactedNotice" class="redacted-notice hidden">⚠️ Click "Redact Selected Items" first, then download.</div>
+        
+        <!-- Privacy Report (file-type aware) -->
+        <div id="privacyReport" class="hidden privacy-report">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="text-2xl">🛡️</span>
+            <h3 class="font-bold text-gray-900">Privacy Verified — File Sanitized</h3>
+          </div>
+          <p class="text-sm text-gray-700 mb-3">Your downloaded file has been completely rebuilt from scratch. All hidden data has been removed:</p>
+          <div id="privacyItems" class="grid grid-cols-1 md:grid-cols-2 gap-1"></div>
+          <p class="text-xs text-gray-600 mt-3 italic">Your document is now truly anonymous and cannot be traced back to its origin.</p>
+        </div>
+
+        <div class="preview-container bg-gray-100 rounded-lg p-4 flex flex-col items-center gap-4 relative" id="previewContainer">
+          <p class="text-gray-500 text-sm">Preview will appear here</p>
+        </div>
+        <button id="downloadBtn" class="hidden w-full mt-4 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition">⬇ Download Redacted File</button>
+      </div>
+    </div>
+
+    <button id="resetBtn" class="mt-6 text-sm text-gray-500 hover:text-gray-700 underline">← Process another file</button>
+  </div>
+
+</main>
+
+<footer class="max-w-6xl mx-auto px-6 py-8 text-center text-sm text-gray-400 border-t border-gray-200 mt-12">
+  <p class="mb-2">RedactLocal — Open source, client-side only. Your data never touches a server.</p>
+  <p class="text-xs">Built for privacy. No tracking. No uploads. No accounts.</p>
+</footer>
+
+<script>
+// ============================================================
+// CONFIG
+// ============================================================
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const CHECKOUT_URL = 'https://yourstore.lemonsqueezy.com/checkout/custom/xxxxx';
+
+const FREE_LIMITS = {
+  maxPages: 1,
+  maxRedactions: 5,
+  watermarkThreshold: 3
+};
+
+const MAX_FILE_SIZE = 50 * 1024 * 1024;
+
+// ============================================================
+// STATE
+// ============================================================
+const state = {
+  fileType: null,
+  file: null,
+  pages: [],
+  currentDetections: [],
+  showingAfter: false,
+  redactionApplied: false,
+  isPro: false,
+  drawMode: false,
+  activeTab: 'auto',
+  freeRedactionsUsed: 0,
+  originalMetadata: null,
+  ocrData: null,
+};
+
+// ============================================================
+// LICENSE MANAGEMENT
+// ============================================================
+function checkLicense() {
+  const key = localStorage.getItem('redactlocal_license');
+  if (key && validateKeyFormat(key)) {
+    state.isPro = true;
+    document.getElementById('proStatus').classList.remove('hidden');
+    document.getElementById('proStatus').classList.add('flex');
+    updateProUI();
+  }
+}
+
+function validateKeyFormat(key) {
+  return /^RL-PRO-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(key);
+}
+
+function activateLicense() {
+  const input = document.getElementById('licenseInput');
+  const key = input.value.trim().toUpperCase();
+  if (validateKeyFormat(key)) {
+    localStorage.setItem('redactlocal_license', key);
+    state.isPro = true;
+    document.getElementById('proStatus').classList.remove('hidden');
+    document.getElementById('proStatus').classList.add('flex');
+    updateProUI();
+    document.getElementById('settingsModal').classList.add('hidden');
+    alert('✅ Pro activated! All features unlocked.');
+  } else {
+    alert('❌ Invalid license key format. Expected: RL-PRO-XXXX-XXXX-XXXX');
+  }
+}
+
+function resetLicense() {
+  localStorage.removeItem('redactlocal_license');
+  state.isPro = false;
+  document.getElementById('proStatus').classList.add('hidden');
+  document.getElementById('proStatus').classList.remove('flex');
+  updateProUI();
+  alert('✅ License reset. You are now on the free plan.');
+}
+
+function updateProUI() {
+  if (state.isPro) {
+    document.getElementById('keywordLocked').classList.add('hidden');
+    document.getElementById('keywordUnlocked').classList.remove('hidden');
+    document.getElementById('drawLocked').classList.add('hidden');
+    document.getElementById('drawUnlocked').classList.remove('hidden');
+    document.getElementById('drawModeBtn').classList.remove('hidden');
+    document.getElementById('limitNotice').classList.add('hidden');
+  } else {
+    document.getElementById('keywordLocked').classList.remove('hidden');
+    document.getElementById('keywordUnlocked').classList.add('hidden');
+    document.getElementById('drawLocked').classList.remove('hidden');
+    document.getElementById('drawUnlocked').classList.add('hidden');
+    document.getElementById('drawModeBtn').classList.add('hidden');
+  }
+}
+
+// ============================================================
+// MAGIC BYTES FILE TYPE DETECTION
+// ============================================================
+async function detectRealFileType(file) {
+  if (file.size < 12) return 'unknown';
+  const buffer = await file.slice(0, 16).arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+
+  if (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) return 'pdf';
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) return 'png';
+  if (bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) return 'jpeg';
+  if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+      bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) return 'webp';
+  return 'unknown';
+}
+
+// ============================================================
+// ERROR HANDLING
+// ============================================================
+function showError(title, message) {
+  document.getElementById('errorTitle').textContent = '❌ ' + title;
+  document.getElementById('errorMessage').textContent = message;
+  document.getElementById('errorState').classList.remove('hidden');
+  document.getElementById('dropZone').classList.add('hidden');
+  document.getElementById('processingState').classList.add('hidden');
+  document.getElementById('resultsState').classList.add('hidden');
+}
+
+function hideError() {
+  document.getElementById('errorState').classList.add('hidden');
+}
+
+// ============================================================
+// FILE VALIDATION
+// ============================================================
+async function validateFile(file) {
+  if (file.size === 0) {
+    showError('Empty File', 'The file you uploaded is empty (0 bytes). Please upload a valid file.');
+    return false;
+  }
+  if (file.size > MAX_FILE_SIZE) {
+    showError('File Too Large', 'The file is ' + (file.size / 1024 / 1024).toFixed(1) + 'MB. Maximum size is 50MB.');
+    return false;
+  }
+
+  const realType = await detectRealFileType(file);
+  const fileName = file.name.toLowerCase();
+
+  let claimedType = 'unknown';
+  if (fileName.endsWith('.pdf')) claimedType = 'pdf';
+  else if (fileName.endsWith('.png')) claimedType = 'png';
+  else if (fileName.endsWith('.jpg') || fileName.endsWith('.jpeg')) claimedType = 'jpeg';
+  else if (fileName.endsWith('.webp')) claimedType = 'webp';
+
+  if (realType === 'unknown') {
+    showError('Unrecognized File Format', 'We could not identify this file type. Please upload a valid PDF, PNG, JPG, or WEBP file.');
+    return false;
+  }
+
+  if (realType !== claimedType) {
+    const typeNames = { pdf: 'PDF document', png: 'PNG image', jpeg: 'JPEG image', webp: 'WEBP image' };
+    const extNames = { pdf: 'pdf', png: 'png', jpeg: 'jpg', webp: 'webp' };
+    showError('File Extension Mismatch', 'This file is actually a ' + typeNames[realType] + ', but has a .' + extNames[claimedType] + ' extension. Please rename the file to match its actual format, or upload the correct file.');
+    return false;
+  }
+
+  return true;
+}
+
+// ============================================================
+// METADATA EXTRACTION
+// ============================================================
+async function extractMetadata(file) {
+  const metadata = {
+    fileName: file.name,
+    fileSize: file.size,
+    fileType: file.type,
+    hasExif: false,
+    hasGps: false,
+    hasAuthor: false,
+    hasCreationDate: false,
+    hasSoftware: false
+  };
+
+  if (file.type.startsWith('image/')) {
+    try {
+      const buffer = await file.slice(0, 10000).arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      // Look for EXIF marker (FF E1) anywhere in first 10KB
+      for (let i = 0; i < bytes.length - 1; i++) {
+        if (bytes[i] === 0xFF && bytes[i+1] === 0xE1) {
+          metadata.hasExif = true;
+          const exifStr = new TextDecoder('utf-8', { fatal: false }).decode(bytes.slice(i, Math.min(i + 2000, bytes.length)));
+          if (/GPS|gps/i.test(exifStr)) metadata.hasGps = true;
+          break;
+        }
+      }
+    } catch (e) {
+      console.warn('Could not extract image metadata:', e);
+    }
+  }
+
+  if (file.name.toLowerCase().endsWith('.pdf')) {
+    try {
+      const buffer = await file.slice(0, 50000).arrayBuffer();
+      const text = new TextDecoder('utf-8', { fatal: false }).decode(buffer);
+      if (/\/(Author|Creator)\s*\(/.test(text)) metadata.hasAuthor = true;
+      if (/\/CreationDate\s*\(/.test(text)) metadata.hasCreationDate = true;
+      if (/\/(Producer|Creator)\s*\(/.test(text)) metadata.hasSoftware = true;
+    } catch (e) {
+      console.warn('Could not extract PDF metadata:', e);
+    }
+  }
+
+  return metadata;
+}
+
+// ============================================================
+// PII PATTERNS
+// ============================================================
+const PII_PATTERNS = {
+  ssn: { label: "Social Security Number", regex: /\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b/g, severity: "critical" },
+  email: { label: "Email Address", regex: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, severity: "high" },
+  phone: { label: "Phone Number", regex: /(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g, severity: "high" },
+  creditCard: { label: "Credit Card", regex: /\b(?:\d{4}[-\s]?){3}\d{4}\b/g, severity: "critical" },
+  ipAddress: { label: "IP Address", regex: /\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b/g, severity: "medium" },
+  dob: { label: "Date of Birth", regex: /\b(?:0[1-9]|1[0-2])[\/\-](?:0[1-9]|[12]\d|3[01])[\/\-](?:19|20)\d{2}\b/g, severity: "high" },
+  bankAccount: { label: "Bank Account Number", regex: /\b\d{8,17}\b/g, severity: "critical" },
+  routingNumber: { label: "Routing Number", regex: /\b\d{9}\b/g, severity: "critical" },
+  driverLicense: { label: "Driver's License", regex: /\b[A-Z]\d{7,14}\b/g, severity: "high" },
+  passport: { label: "Passport Number", regex: /\b[A-Z]{1,2}\d{6,9}\b/g, severity: "high" },
+  vin: { label: "Vehicle ID Number", regex: /\b[A-HJ-NPR-Z0-9]{17}\b/g, severity: "medium" }
+};
+
+// ============================================================
+// DOM ELEMENTS
+// ============================================================
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const errorState = document.getElementById('errorState');
+const errorResetBtn = document.getElementById('errorResetBtn');
+const processingState = document.getElementById('processingState');
+const processingText = document.getElementById('processingText');
+const processingDetail = document.getElementById('processingDetail');
+const progressBar = document.getElementById('progressBar');
+const resultsState = document.getElementById('resultsState');
+const reviewList = document.getElementById('reviewList');
+const detectionCount = document.getElementById('detectionCount');
+const previewContainer = document.getElementById('previewContainer');
+const downloadBtn = document.getElementById('downloadBtn');
+const redactBtn = document.getElementById('redactBtn');
+const redactStatus = document.getElementById('redactStatus');
+const redactedNotice = document.getElementById('redactedNotice');
+const privacyReport = document.getElementById('privacyReport');
+const privacyItems = document.getElementById('privacyItems');
+const resetBtn = document.getElementById('resetBtn');
+const beforeBtn = document.getElementById('beforeBtn');
+const afterBtn = document.getElementById('afterBtn');
+const selectAllBtn = document.getElementById('selectAllBtn');
+const deselectAllBtn = document.getElementById('deselectAllBtn');
+const settingsBtn = document.getElementById('settingsBtn');
+const settingsModal = document.getElementById('settingsModal');
+const closeSettings = document.getElementById('closeSettings');
+const activateBtn = document.getElementById('activateBtn');
+const resetLicenseBtn = document.getElementById('resetLicenseBtn');
+const drawModeBtn = document.getElementById('drawModeBtn');
+const heroSection = document.getElementById('heroSection');
+const limitNotice = document.getElementById('limitNotice');
+
+// ============================================================
+// EVENT LISTENERS
+// ============================================================
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', (e) => {
+  if (e.target.files.length) handleFile(e.target.files[0]);
+});
+
+errorResetBtn.addEventListener('click', resetApp);
+settingsBtn.addEventListener('click', () => settingsModal.classList.remove('hidden'));
+closeSettings.addEventListener('click', () => settingsModal.classList.add('hidden'));
+activateBtn.addEventListener('click', activateLicense);
+resetLicenseBtn.addEventListener('click', resetLicense);
+document.querySelectorAll('.open-settings').forEach(btn => {
+  btn.addEventListener('click', () => settingsModal.classList.remove('hidden'));
+});
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    if ((tab === 'keyword' || tab === 'draw') && !state.isPro) {
+      settingsModal.classList.remove('hidden');
+      return;
+    }
+    state.activeTab = tab;
+    document.querySelectorAll('.tab-btn').forEach(b => { b.classList.remove('tab-active'); b.classList.add('tab-inactive'); });
+    btn.classList.remove('tab-inactive');
+    btn.classList.add('tab-active');
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+    document.getElementById('tab-' + tab).classList.remove('hidden');
+  });
+});
+
+// ============================================================
+// FILE HANDLING
+// ============================================================
+async function handleFile(file) {
+  hideError();
+
+  if (!(await validateFile(file))) {
+    return;
+  }
+
+  state.file = file;
+  state.redactionApplied = false;
+  state.freeRedactionsUsed = 0;
+  state.ocrData = null;
+  state.drawMode = false; // Reset draw mode on new file
+  heroSection.classList.add('hidden');
+  privacyReport.classList.add('hidden');
+
+  state.originalMetadata = await extractMetadata(file);
+
+  const name = file.name.toLowerCase();
+  try {
+    if (name.endsWith('.pdf')) {
+      state.fileType = 'pdf';
+      await processPDF(file);
+    } else if (/\.(png|jpg|jpeg|webp)$/.test(name)) {
+      state.fileType = 'image';
+      await processImage(file);
+    } else {
+      showError('Unsupported File Type', 'Please upload a PDF, PNG, JPG, or WEBP file.');
+    }
+  } catch (error) {
+    console.error('File processing error:', error);
+    if (error.name === 'PasswordException') {
+      showError('Password-Protected PDF', 'This PDF is password-protected. Please remove the password and try again.');
+    } else if (error.name === 'InvalidPDFException') {
+      showError('Invalid PDF', 'This PDF file appears to be corrupted or invalid. Please try a different file.');
+    } else if (error.message && error.message.includes('PDF')) {
+      showError('PDF Processing Error', 'Unable to process this PDF. The file may be corrupted or in an unsupported format.');
+    } else if (error.message && error.message.includes('image')) {
+      showError('Image Processing Error', 'Unable to process this image. The file may be corrupted or in an unsupported format.');
+    } else {
+      showError('Processing Error', 'An unexpected error occurred while processing your file. Please try again or use a different file.');
+    }
+  }
+}
+
+// ============================================================
+// PDF PROCESSING
+// ============================================================
+async function processPDF(file) {
+  showProcessing('Reading PDF...', 'Extracting text and layout');
+
+  let arrayBuffer;
+  try {
+    arrayBuffer = await file.arrayBuffer();
+  } catch (error) {
+    throw new Error('Unable to read file. The file may be corrupted.');
+  }
+
+  if (arrayBuffer.byteLength === 0) {
+    throw new Error('PDF file is empty.');
+  }
+
+  let pdf;
+  try {
+    pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  } catch (error) {
+    console.error('PDF loading error:', error);
+    if (error.name === 'PasswordException') throw error;
+    if (error.name === 'InvalidPDFException') throw error;
+    throw new Error('Unable to load PDF. The file may be corrupted or password-protected.');
+  }
+
+  state.pages = [];
+  state.currentDetections = [];
+
+  if (!state.isPro && pdf.numPages > FREE_LIMITS.maxPages) {
+    hideProcessing();
+    showResults();
+    limitNotice.classList.remove('hidden');
+    alert('⚠️ Free tier is limited to ' + FREE_LIMITS.maxPages + ' page(s). This PDF has ' + pdf.numPages + ' pages. Upgrade to Pro for unlimited pages.');
+    return;
+  }
+
+  for (let i = 1; i <= pdf.numPages; i++) {
+    try {
+      updateProcessing('Processing page ' + i + ' of ' + pdf.numPages + '...', (i / pdf.numPages) * 100);
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 2.0 });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d');
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      const textContent = await page.getTextContent();
+      const detections = [];
+
+      for (const item of textContent.items) {
+        if (!item.str || !item.str.trim()) continue;
+        const found = detectPII(item.str);
+        if (found.length === 0) continue;
+
+        const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+        const fontSize = Math.sqrt(tx[0] * tx[0] + tx[1] * tx[1]);
+        const x = tx[4];
+        const y = tx[5] - fontSize;
+        const width = item.width * viewport.scale;
+        const height = fontSize * 1.2;
+
+        for (const match of found) {
+          detections.push({
+            id: 'p' + i + '-' + detections.length + '-' + Math.random(),
+            pageIndex: i - 1,
+            type: match.type,
+            label: match.label,
+            severity: match.severity,
+            text: match.text,
+            x, y, width, height,
+            selected: true
+          });
+        }
+      }
+
+      const originalCanvas = document.createElement('canvas');
+      originalCanvas.width = canvas.width;
+      originalCanvas.height = canvas.height;
+      originalCanvas.getContext('2d').drawImage(canvas, 0, 0);
+
+      state.pages.push({ canvas, originalCanvas, detections, textContent, viewport });
+      state.currentDetections.push(...detections);
+    } catch (error) {
+      console.error('Error processing page ' + i + ':', error);
+      throw new Error('Failed to process page ' + i + '. The PDF may be corrupted.');
+    }
+  }
+
+  hideProcessing();
+  showResults();
+}
+
+// ============================================================
+// IMAGE PROCESSING
+// ============================================================
+async function processImage(file) {
+  showProcessing('Loading OCR engine...', 'This may take 10-30 seconds on first run');
+  updateProcessing('Initializing Tesseract...', 10);
+
+  let worker;
+  try {
+    worker = await Tesseract.createWorker('eng', 1, {
+      logger: (m) => {
+        if (m.status === 'recognizing text') {
+          updateProcessing('Recognizing text...', 10 + m.progress * 80);
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Tesseract initialization error:', error);
+    throw new Error('Unable to initialize OCR engine. Please refresh the page and try again.');
+  }
+
+  updateProcessing('Reading image...', 90);
+  const img = new Image();
+
+  try {
+    img.src = URL.createObjectURL(file);
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = () => reject(new Error('Unable to load image. The file may be corrupted.'));
+    });
+  } catch (error) {
+    await worker.terminate();
+    throw error;
+  }
+
+  if (img.naturalWidth === 0 || img.naturalHeight === 0) {
+    await worker.terminate();
+    throw new Error('Image appears to be invalid or corrupted.');
+  }
+
+  const scale = 2;
+  const canvas = document.createElement('canvas');
+  canvas.width = img.naturalWidth * scale;
+  canvas.height = img.naturalHeight * scale;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  updateProcessing('Running OCR...', 95);
+
+  let data;
+  try {
+    const result = await worker.recognize(canvas);
+    data = result.data;
+    state.ocrData = data;
+  } catch (error) {
+    console.error('OCR error:', error);
+    await worker.terminate();
+    throw new Error('OCR processing failed. The image may be too small, blurry, or in an unsupported format.');
+  }
+
+  await worker.terminate();
+
+  const detections = [];
+  for (const word of data.words) {
+    const found = detectPII(word.text);
+    if (found.length === 0) continue;
+    for (const match of found) {
+      detections.push({
+        id: 'img-' + detections.length + '-' + Math.random(),
+        pageIndex: 0,
+        type: match.type,
+        label: match.label,
+        severity: match.severity,
+        text: match.text,
+        x: word.bbox.x0 * scale,
+        y: word.bbox.y0 * scale,
+        width: (word.bbox.x1 - word.bbox.x0) * scale,
+        height: (word.bbox.y1 - word.bbox.y0) * scale,
+        selected: true
+      });
+    }
+  }
+
+  const originalCanvas = document.createElement('canvas');
+  originalCanvas.width = canvas.width;
+  originalCanvas.height = canvas.height;
+  originalCanvas.getContext('2d').drawImage(canvas, 0, 0);
+
+  state.pages = [{ canvas, originalCanvas, detections }];
+  state.currentDetections = detections;
+
+  hideProcessing();
+  showResults();
+}
+
+// ============================================================
+// PII DETECTION
+// ============================================================
+function detectPII(text) {
+  const results = [];
+  for (const [key, pattern] of Object.entries(PII_PATTERNS)) {
+    const regex = new RegExp(pattern.regex.source, pattern.regex.flags);
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      results.push({ type: key, label: pattern.label, severity: pattern.severity, text: match[0] });
+    }
+  }
+  return results;
+}
+
+// ============================================================
+// KEYWORD SEARCH
+// ============================================================
+document.getElementById('searchKeywordBtn').addEventListener('click', () => {
+  if (!state.isPro) {
+    alert('⚠️ Keyword search is a Pro feature. Please upgrade to Pro to use this feature.');
+    settingsModal.classList.remove('hidden');
+    return;
+  }
+
+  const keyword = document.getElementById('keywordInput').value.trim();
+  if (!keyword) {
+    alert('⚠️ Please enter a keyword or phrase to search for.');
+    return;
+  }
+
+  let regex;
+  try {
+    regex = new RegExp(keyword, 'gi');
+  } catch (e) {
+    alert('❌ Invalid regex pattern. Please check your search term.');
+    return;
+  }
+
+  let matchCount = 0;
+
+  if (state.fileType === 'pdf') {
+    state.pages.forEach((page, pageIndex) => {
+      if (!page.textContent) return;
+      for (const item of page.textContent.items) {
+        if (!item.str) continue;
+        let match;
+        const localRegex = new RegExp(regex.source, regex.flags);
+        while ((match = localRegex.exec(item.str)) !== null) {
+          const matchText = match[0];
+          const matchStart = match.index;
+          const matchLength = matchText.length;
+          const tx = pdfjsLib.Util.transform(page.viewport.transform, item.transform);
+          const fontSize = Math.sqrt(tx[0] * tx[0] + tx[1] * tx[1]);
+          const avgCharWidth = (item.width * page.viewport.scale) / item.str.length;
+          const xOffset = matchStart * avgCharWidth;
+          const matchWidth = matchLength * avgCharWidth;
+
+          const det = {
+            id: 'kw-' + pageIndex + '-' + matchCount + '-' + Math.random(),
+            pageIndex, type: 'keyword', label: 'Keyword: "' + keyword + '"',
+            severity: 'manual', text: matchText,
+            x: tx[4] + xOffset, y: tx[5] - fontSize,
+            width: matchWidth, height: fontSize * 1.2,
+            selected: true
+          };
+          state.currentDetections.push(det);
+          page.detections.push(det);
+          matchCount++;
+        }
+      }
+    });
+  }
+
+  if (state.fileType === 'image' && state.ocrData) {
+    const scale = 2;
+    for (const word of state.ocrData.words) {
+      let match;
+      const localRegex = new RegExp(regex.source, regex.flags);
+      while ((match = localRegex.exec(word.text)) !== null) {
+        const matchText = match[0];
+        const matchStart = match.index;
+        const matchLength = matchText.length;
+        const wordWidth = word.bbox.x1 - word.bbox.x0;
+        const avgCharWidth = wordWidth / word.text.length;
+        const xOffset = matchStart * avgCharWidth;
+        const matchWidth = matchLength * avgCharWidth;
+
+        const det = {
+          id: 'kw-img-' + matchCount + '-' + Math.random(),
+          pageIndex: 0, type: 'keyword', label: 'Keyword: "' + keyword + '"',
+          severity: 'manual', text: matchText,
+          x: (word.bbox.x0 + xOffset) * scale, y: word.bbox.y0 * scale,
+          width: matchWidth * scale, height: (word.bbox.y1 - word.bbox.y0) * scale,
+          selected: true
+        };
+        state.currentDetections.push(det);
+        state.pages[0].detections.push(det);
+        matchCount++;
+      }
+    }
+  }
+
+  if (matchCount === 0) {
+    alert('ℹ️ No matches found for "' + keyword + '"');
+  } else {
+    alert('✅ Found and added ' + matchCount + ' redaction(s) for "' + keyword + '"');
+    renderReviewList();
+    renderPreview();
+  }
+  document.getElementById('keywordInput').value = '';
+});
+
+// ============================================================
+// MANUAL DRAW
+// ============================================================
+drawModeBtn.addEventListener('click', () => {
+  state.drawMode = !state.drawMode;
+  drawModeBtn.textContent = state.drawMode ? '✏️ Draw Mode: ON' : '✏️ Draw Mode: OFF';
+  drawModeBtn.classList.toggle('bg-purple-600', state.drawMode);
+  drawModeBtn.classList.toggle('text-white', state.drawMode);
+  drawModeBtn.classList.toggle('bg-purple-100', !state.drawMode);
+  drawModeBtn.classList.toggle('text-purple-800', !state.drawMode);
+  renderPreview();
+});
+
+document.getElementById('toggleDrawMode').addEventListener('click', () => {
+  state.drawMode = !state.drawMode;
+  drawModeBtn.textContent = state.drawMode ? '✏️ Draw Mode: ON' : '✏️ Draw Mode: OFF';
+  if (state.drawMode) { drawModeBtn.classList.add('bg-purple-600', 'text-white'); drawModeBtn.classList.remove('bg-purple-100', 'text-purple-800'); }
+  else { drawModeBtn.classList.remove('bg-purple-600', 'text-white'); drawModeBtn.classList.add('bg-purple-100', 'text-purple-800'); }
+  renderPreview();
+});
+
+// ============================================================
+// UI HELPERS
+// ============================================================
+function showProcessing(text, detail) {
+  dropZone.classList.add('hidden');
+  errorState.classList.add('hidden');
+  resultsState.classList.add('hidden');
+  processingState.classList.remove('hidden');
+  processingText.textContent = text;
+  processingDetail.textContent = detail;
+  progressBar.style.width = '0%';
+}
+function updateProcessing(detail, percent) {
+  processingDetail.textContent = detail;
+  progressBar.style.width = percent + '%';
+}
+function hideProcessing() { processingState.classList.add('hidden'); }
+
+function showResults() {
+  resultsState.classList.remove('hidden');
+  updateProUI();
+  renderReviewList();
+  renderPreview();
+}
+
+function renderReviewList() {
+  reviewList.innerHTML = '';
+  const selected = state.currentDetections.filter(d => d.selected);
+  detectionCount.textContent = state.currentDetections.length + ' items (' + selected.length + ' selected)';
+
+  if (state.currentDetections.length === 0) {
+    reviewList.innerHTML = '<div class="text-center py-6"><p class="text-sm text-gray-500 mb-2">No PII detected in this file.</p><p class="text-xs text-gray-400">Try using Keyword search or Draw mode to add manual redactions.</p></div>';
+    redactBtn.disabled = true;
+    redactBtn.classList.add('redact-btn-disabled');
+    redactBtn.classList.remove('hover:bg-red-700');
+    redactBtn.textContent = '🔒 No Items to Redact';
+  } else {
+    redactBtn.disabled = false;
+    redactBtn.classList.remove('redact-btn-disabled');
+    redactBtn.classList.add('hover:bg-red-700');
+    redactBtn.textContent = '🔒 Redact Selected Items (' + selected.length + ')';
+    
+    for (const d of state.currentDetections) {
+      const row = document.createElement('div');
+      row.className = 'flex items-center gap-2 p-2 bg-gray-50 rounded hover:bg-gray-100';
+      row.innerHTML = '<input type="checkbox" ' + (d.selected ? 'checked' : '') + ' data-id="' + d.id + '" class="detection-checkbox" />' +
+        '<div class="flex-1 min-w-0"><div class="text-xs font-semibold text-gray-700 truncate">' + d.label + '</div>' +
+        '<div class="text-xs text-gray-500 truncate font-mono">' + maskText(d.text) + '</div></div>' +
+        '<span class="severity-' + d.severity + ' text-xs px-2 py-0.5 rounded capitalize">' + d.severity + '</span>';
+      reviewList.appendChild(row);
+    }
+
+    document.querySelectorAll('.detection-checkbox').forEach(cb => {
+      cb.addEventListener('change', (e) => {
+        const det = state.currentDetections.find(d => d.id === e.target.dataset.id);
+        if (det) det.selected = e.target.checked;
+        renderReviewList();
+        renderPreview();
+      });
+    });
+  }
+}
+
+function maskText(text) {
+  if (text.length <= 4) return '****';
+  return text.slice(0, 2) + '•••' + text.slice(-2);
+}
+
+// ============================================================
+// PREVIEW (with FIXED draw mode)
+// ============================================================
+function renderPreview() {
+  previewContainer.innerHTML = '';
+
+  if (!state.redactionApplied && state.currentDetections.length > 0) {
+    redactedNotice.classList.remove('hidden');
+  } else {
+    redactedNotice.classList.add('hidden');
+  }
+
+  state.pages.forEach((page, idx) => {
+    // Create a wrapper that ensures overlay aligns perfectly with canvas
+    const canvasWrapper = document.createElement('div');
+    canvasWrapper.className = 'canvas-wrapper';
+
+    const displayCanvas = document.createElement('canvas');
+    displayCanvas.className = 'display-canvas';
+    displayCanvas.width = page.canvas.width;
+    displayCanvas.height = page.canvas.height;
+    const ctx = displayCanvas.getContext('2d');
+    ctx.drawImage(page.canvas, 0, 0);
+
+    if (!state.showingAfter && !state.redactionApplied) {
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 3;
+      for (const d of page.detections) {
+        if (d.selected) ctx.strokeRect(d.x, d.y, d.width, d.height);
+      }
+    }
+
+    displayCanvas.dataset.pageIndex = idx;
+    canvasWrapper.appendChild(displayCanvas);
+
+    // Add draw overlay if in draw mode (Pro only)
+    if (state.drawMode && state.isPro) {
+      const overlay = document.createElement('canvas');
+      overlay.className = 'draw-overlay';
+      overlay.width = page.canvas.width;
+      overlay.height = page.canvas.height;
+      overlay.dataset.pageIndex = idx;
+      canvasWrapper.appendChild(overlay);
+      setupDrawOverlay(overlay, idx);
+    }
+
+    // Page label for multi-page PDFs
+    const pageWrapper = document.createElement('div');
+    pageWrapper.className = 'flex flex-col items-center gap-1';
+    if (state.pages.length > 1) {
+      const label = document.createElement('div');
+      label.className = 'text-xs text-gray-500';
+      label.textContent = 'Page ' + (idx + 1);
+      pageWrapper.appendChild(label);
+    }
+    pageWrapper.appendChild(canvasWrapper);
+    previewContainer.appendChild(pageWrapper);
+  });
+
+  if (state.redactionApplied) {
+    downloadBtn.classList.remove('hidden');
+  } else {
+    downloadBtn.classList.add('hidden');
+  }
+}
+
+// ============================================================
+// DRAW OVERLAY (FIXED - accurate coordinates + touch support)
+// ============================================================
+function setupDrawOverlay(overlay, pageIndex) {
+  const octx = overlay.getContext('2d');
+  let isDrawing = false;
+  let startX = 0, startY = 0;
+  let lastX = 0, lastY = 0;
+
+  // Convert mouse/touch event to canvas pixel coordinates
+  // Uses the overlay's actual rendered size vs its pixel dimensions
+  function getCoords(e) {
+    const rect = overlay.getBoundingClientRect();
+    const scaleX = overlay.width / rect.width;
+    const scaleY = overlay.height / rect.height;
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY
+    };
+  }
+
+  function drawPreview(endX, endY) {
+    octx.clearRect(0, 0, overlay.width, overlay.height);
+    octx.strokeStyle = '#7c3aed';
+    octx.lineWidth = 3;
+    octx.setLineDash([5, 5]);
+    octx.fillStyle = 'rgba(124, 58, 237, 0.1)';
+    const w = endX - startX;
+    const h = endY - startY;
+    octx.fillRect(startX, startY, w, h);
+    octx.strokeRect(startX, startY, w, h);
+  }
+
+  function finishDrawing(endX, endY) {
+    isDrawing = false;
+    octx.clearRect(0, 0, overlay.width, overlay.height);
+    
+    const w = endX - startX;
+    const h = endY - startY;
+    
+    // Only register if box is big enough (at least 10x10 pixels)
+    if (Math.abs(w) > 10 && Math.abs(h) > 10) {
+      const x = w > 0 ? startX : endX;
+      const y = h > 0 ? startY : endY;
+      const absWidth = Math.abs(w);
+      const absHeight = Math.abs(h);
+
+      const det = {
+        id: 'manual-' + pageIndex + '-' + Date.now() + '-' + Math.random(),
+        pageIndex,
+        type: 'manual',
+        label: 'Manual Redaction',
+        severity: 'manual',
+        text: '[custom area]',
+        x: x,
+        y: y,
+        width: absWidth,
+        height: absHeight,
+        selected: true
+      };
+
+      state.currentDetections.push(det);
+      state.pages[pageIndex].detections.push(det);
+      renderReviewList();
+      renderPreview();
+    }
+  }
+
+  // MOUSE EVENTS
+  overlay.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    const c = getCoords(e);
+    isDrawing = true;
+    startX = c.x;
+    startY = c.y;
+    lastX = c.x;
+    lastY = c.y;
+  });
+
+  overlay.addEventListener('mousemove', (e) => {
+    if (!isDrawing) return;
+    e.preventDefault();
+    const c = getCoords(e);
+    lastX = c.x;
+    lastY = c.y;
+    drawPreview(c.x, c.y);
+  });
+
+  overlay.addEventListener('mouseup', (e) => {
+    if (!isDrawing) return;
+    e.preventDefault();
+    const c = getCoords(e);
+    finishDrawing(c.x, c.y);
+  });
+
+  overlay.addEventListener('mouseleave', (e) => {
+    if (!isDrawing) return;
+    // Finish drawing using last known position
+    finishDrawing(lastX, lastY);
+  });
+
+  // TOUCH EVENTS (for mobile)
+  overlay.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const c = getCoords(touch);
+    isDrawing = true;
+    startX = c.x;
+    startY = c.y;
+    lastX = c.x;
+    lastY = c.y;
+  }, { passive: false });
+
+  overlay.addEventListener('touchmove', (e) => {
+    if (!isDrawing) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const c = getCoords(touch);
+    lastX = c.x;
+    lastY = c.y;
+    drawPreview(c.x, c.y);
+  }, { passive: false });
+
+  overlay.addEventListener('touchend', (e) => {
+    if (!isDrawing) return;
+    e.preventDefault();
+    finishDrawing(lastX, lastY);
+  }, { passive: false });
+
+  overlay.addEventListener('touchcancel', (e) => {
+    if (!isDrawing) return;
+    e.preventDefault();
+    octx.clearRect(0, 0, overlay.width, overlay.height);
+    isDrawing = false;
+  }, { passive: false });
+}
+
+// ============================================================
+// REDACTION
+// ============================================================
+redactBtn.addEventListener('click', () => {
+  const selectedCount = state.currentDetections.filter(d => d.selected).length;
+
+  if (selectedCount === 0) {
+    alert('⚠️ No items selected for redaction. Please select at least one detected PII item, or use Keyword/Draw mode to add redactions.');
+    return;
+  }
+
+  if (!state.isPro) {
+    if (state.freeRedactionsUsed + selectedCount > FREE_LIMITS.maxRedactions) {
+      limitNotice.classList.remove('hidden');
+      alert('⚠️ Free tier is limited to ' + FREE_LIMITS.maxRedactions + ' redactions per session. You have selected ' + selectedCount + ' items but have already used ' + state.freeRedactionsUsed + '. Upgrade to Pro for unlimited redactions.');
+      return;
+    }
+  }
+
+  const PAD = 5;
+  const shouldShowWatermark = !state.isPro && selectedCount > FREE_LIMITS.watermarkThreshold;
+
+  for (const page of state.pages) {
+    const ctx = page.canvas.getContext('2d');
+    ctx.drawImage(page.originalCanvas, 0, 0);
+    ctx.fillStyle = '#000000';
+    for (const d of page.detections) {
+      if (d.selected) ctx.fillRect(d.x - PAD, d.y - PAD, d.width + PAD * 2, d.height + PAD * 2);
+    }
+    if (shouldShowWatermark) {
+      ctx.save();
+      ctx.font = 'bold 36px Arial';
+      ctx.fillStyle = 'rgba(200, 0, 0, 0.12)';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.translate(page.canvas.width / 2, page.canvas.height / 2);
+      ctx.rotate(-Math.PI / 6);
+      ctx.fillText('REDACTLOCAL FREE', 0, 0);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.font = 'bold 14px Arial';
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+      ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+      ctx.fillText('Redacted with RedactLocal (Free)', page.canvas.width - 15, page.canvas.height - 15);
+      ctx.restore();
+    }
+  }
+
+  if (!state.isPro) state.freeRedactionsUsed += selectedCount;
+  state.redactionApplied = true;
+  state.showingAfter = true;
+  redactStatus.classList.remove('hidden');
+  afterBtn.classList.add('bg-blue-100', 'text-blue-800');
+  beforeBtn.classList.remove('bg-blue-100', 'text-blue-800');
+  
+  renderPrivacyReport();
+  privacyReport.classList.remove('hidden');
+  
+  renderPreview();
+});
+
+// ============================================================
+// PRIVACY REPORT (file-type aware)
+// ============================================================
+function renderPrivacyReport() {
+  privacyItems.innerHTML = '';
+  
+  const pdfItems = [
+    'Original text layer removed (converted to image)',
+    'Document metadata cleared',
+    'Embedded fonts removed',
+    'JavaScript/actions removed',
+    'Author/creator names removed',
+    'Creation date removed',
+    'Producer software info removed',
+    'File rebuilt from scratch'
+  ];
+  
+  const imageItems = [
+    'EXIF data completely stripped',
+    'GPS/location data removed',
+    'Camera make/model removed',
+    'Creation software info removed',
+    'Thumbnail data removed',
+    'Date/time taken removed',
+    'Orientation data removed',
+    'File rebuilt as clean PNG'
+  ];
+  
+  const items = state.fileType === 'pdf' ? pdfItems : imageItems;
+  
+  items.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'privacy-item';
+    div.textContent = item;
+    privacyItems.appendChild(div);
+  });
+}
+
+// ============================================================
+// TOGGLES
+// ============================================================
+beforeBtn.addEventListener('click', () => { state.showingAfter = false; beforeBtn.classList.add('bg-blue-100', 'text-blue-800'); afterBtn.classList.remove('bg-blue-100', 'text-blue-800'); renderPreview(); });
+afterBtn.addEventListener('click', () => { state.showingAfter = true; afterBtn.classList.add('bg-blue-100', 'text-blue-800'); beforeBtn.classList.remove('bg-blue-100', 'text-blue-800'); renderPreview(); });
+selectAllBtn.addEventListener('click', () => { state.currentDetections.forEach(d => d.selected = true); renderReviewList(); renderPreview(); });
+deselectAllBtn.addEventListener('click', () => { state.currentDetections.forEach(d => d.selected = false); renderReviewList(); renderPreview(); });
+
+// ============================================================
+// DOWNLOAD (with clean filename)
+// ============================================================
+downloadBtn.addEventListener('click', async () => {
+  if (!state.redactionApplied) { alert('⚠️ Please click "Redact Selected Items" first.'); return; }
+  try {
+    // Clean filename - remove any existing "redacted_" prefix to avoid accumulation
+    let cleanName = state.file.name;
+    while (cleanName.toLowerCase().startsWith('redacted_')) {
+      cleanName = cleanName.substring(9);
+    }
+    const outputName = 'redacted_' + cleanName;
+    
+    if (state.fileType === 'pdf') {
+      const { jsPDF } = window.jspdf;
+      const fp = state.pages[0].canvas;
+      const orient = fp.width > fp.height ? 'l' : 'p';
+      
+      const pdf = new jsPDF({ 
+        orientation: orient, 
+        unit: 'pt', 
+        format: [fp.width / 2, fp.height / 2],
+        compress: true
+      });
+      
+      pdf.setProperties({
+        title: '', subject: '', author: '', keywords: '', creator: ''
+      });
+      
+      for (let i = 0; i < state.pages.length; i++) {
+        const p = state.pages[i];
+        const img = p.canvas.toDataURL('image/jpeg', 0.92);
+        if (i > 0) pdf.addPage([p.canvas.width / 2, p.canvas.height / 2], orient);
+        pdf.addImage(img, 'JPEG', 0, 0, p.canvas.width / 2, p.canvas.height / 2);
+      }
+      pdf.save(outputName);
+    } else {
+      const cleanCanvas = document.createElement('canvas');
+      cleanCanvas.width = state.pages[0].canvas.width;
+      cleanCanvas.height = state.pages[0].canvas.height;
+      const cleanCtx = cleanCanvas.getContext('2d');
+      cleanCtx.drawImage(state.pages[0].canvas, 0, 0);
+      
+      cleanCanvas.toBlob((blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); 
+        a.href = url; 
+        // Change extension to .png since we're exporting as PNG
+        const pngName = outputName.replace(/\.(jpg|jpeg|webp)$/i, '.png');
+        a.download = pngName;
+        a.click();
+        URL.revokeObjectURL(url);
+      }, 'image/png');
+    }
+  } catch (error) {
+    console.error('Download error:', error);
+    alert('❌ Unable to download file. Please try again.');
+  }
+});
+
+// ============================================================
+// RESET
+// ============================================================
+function resetApp() {
+  state.file = null; state.fileType = null; state.pages = []; state.currentDetections = [];
+  state.showingAfter = false; state.redactionApplied = false; state.drawMode = false; state.freeRedactionsUsed = 0;
+  state.originalMetadata = null; state.ocrData = null;
+  hideError();
+  resultsState.classList.add('hidden'); limitNotice.classList.add('hidden');
+  privacyReport.classList.add('hidden');
+  dropZone.classList.remove('hidden'); heroSection.classList.remove('hidden');
+  fileInput.value = ''; redactStatus.classList.add('hidden');
+  // Reset draw mode button UI
+  drawModeBtn.textContent = '✏️ Draw Mode: OFF';
+  drawModeBtn.classList.remove('bg-purple-600', 'text-white');
+  drawModeBtn.classList.add('bg-purple-100', 'text-purple-800');
+}
+resetBtn.addEventListener('click', resetApp);
+
+// ============================================================
+// INIT
+// ============================================================
+checkLicense();
+</script>
+</body>
+</html>
