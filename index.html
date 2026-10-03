@@ -3,19 +3,19 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>RedactLocal — Free Online PDF & Image Redactor | 100% Local PII Redactor</title>
-<meta name="description" content="Automatically redact sensitive information (SSN, email, phone, credit cards) from PDFs and images. 100% client-side, no uploads, no accounts. Free online PII redactor." />
-<meta name="keywords" content="redact PDF, remove SSN from PDF, black out text PDF, PII redactor, privacy, secure document redaction, free online redactor" />
+<title>RedactNook — Free PDF Redactor, Merge & Split | 100% Local PII Removal</title>
+<meta name="description" content="Redact sensitive information (SSN, email, phone, credit cards) from PDFs and images, plus merge and split PDF. 100% client-side, no uploads, no accounts. Free online PDF tool." />
+<meta name="keywords" content="redact PDF, remove SSN from PDF, black out text PDF, PII redactor, merge PDF, split PDF, combine PDF, extract pages, privacy, free online redactor" />
 <meta name="robots" content="index, follow" />
-<link rel="canonical" href="https://redactlocal-one.vercel.app/" />
+<link rel="canonical" href="https://redactnook.vercel.app/" />
 <meta property="og:type" content="website" />
-<meta property="og:site_name" content="RedactLocal" />
-<meta property="og:url" content="https://redactlocal-one.vercel.app/" />
-<meta property="og:title" content="RedactLocal — 100% Local PII Redactor" />
+<meta property="og:site_name" content="RedactNook" />
+<meta property="og:url" content="https://redactnook.vercel.app/" />
+<meta property="og:title" content="RedactNook — 100% Local PII Redactor, Merge & Split" />
 <meta property="og:description" content="Redact PII from PDFs and images, plus merge and split PDF — all client-side. No uploads, no accounts. Free." />
-<meta property="og:image" content="https://via.placeholder.com/1200x630/2563eb/ffffff?text=RedactLocal" />
+<meta property="og:image" content="https://via.placeholder.com/1200x630/2563eb/ffffff?text=RedactNook" />
 <meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="RedactLocal — 100% Local PII Redactor" />
+<meta name="twitter:title" content="RedactNook — 100% Local PII Redactor" />
 <meta name="twitter:description" content="Redact PII from PDFs and images, plus merge and split PDF — all client-side. No uploads, no accounts. Free." />
 
 <script src="https://cdn.tailwindcss.com"></script>
@@ -79,8 +79,8 @@
     <div class="flex items-center gap-3">
       <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">R</div>
       <div>
-        <h1 class="text-xl font-bold text-gray-900">RedactLocal</h1>
-        <p class="text-xs text-gray-500">100% Local PII Redactor</p>
+        <h1 class="text-xl font-bold text-gray-900">RedactNook</h1>
+        <p class="text-xs text-gray-500">Redact &middot; Merge &middot; Split — 100% Local</p>
       </div>
     </div>
     <div class="flex items-center gap-3">
@@ -353,7 +353,7 @@
 </main>
 
 <footer class="max-w-6xl mx-auto px-6 py-8 text-center text-sm text-gray-400 border-t border-gray-200 mt-12">
-  <p class="mb-2">RedactLocal — Open source, client-side only. Your data never touches a server.</p>
+  <p class="mb-2">RedactNook — Open source, client-side only. Your data never touches a server.</p>
   <p class="text-xs">Built for privacy. No tracking. No uploads. No accounts |  <a href="https://tally.so/r/BzMAyR" target="_blank" class="text-blue-500 hover:underline">Send Feedback</a> </p>
 </footer>
 
@@ -1350,7 +1350,7 @@ redactBtn.addEventListener('click', () => {
       ctx.font = 'bold 14px Arial';
       ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
       ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
-      ctx.fillText('Redacted with RedactLocal (Free)', page.canvas.width - 15, page.canvas.height - 15);
+      ctx.fillText('Redacted with RedactNook (Free)', page.canvas.width - 15, page.canvas.height - 15);
       ctx.restore();
     }
   }
