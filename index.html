@@ -151,17 +151,6 @@
       <button id="closeSettings" class="text-gray-400 hover:text-gray-600 text-2xl">×</button>
     </div>
     <div class="space-y-4">
-      <div>
-        <label class="block text-sm font-semibold mb-2">License Key</label>
-        <input id="licenseInput" type="text" placeholder="RL-PRO-XXXX-XXXX-XXXX" class="w-full border border-gray-300 rounded-lg px-3 py-2 font-mono text-sm" />
-        <p class="text-xs text-gray-500 mt-1">Enter your Pro license key to unlock all features.</p>
-      </div>
-      <button id="activateBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg">Activate</button>
-      <div class="border-t pt-4">
-        <p class="text-sm text-gray-600 mb-2">Don't have a license?</p>
-        <a id="buyLink" href="https://localredact.lemonsqueezy.com/checkout/buy/4f592604-a4ac-4b8b-8ee9-0fcd701f6230" target="_blank" class="block w-full bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white font-bold py-3 rounded-lg text-center">⭐ Upgrade to Pro — $19 one-time</a>
-        <p class="text-xs text-gray-500 mt-2 text-center">Unlimited pages, redactions, and advanced features</p>
-      </div>
     </div>
   </div>
 </div>
@@ -396,7 +385,6 @@
 // CONFIG
 // ============================================================
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const CHECKOUT_URL = 'https://yourstore.lemonsqueezy.com/checkout/custom/xxxxx';
 
 const FREE_LIMITS = {
   maxPages: 1,
@@ -416,7 +404,7 @@ const state = {
   currentDetections: [],
   showingAfter: false,
   redactionApplied: false,
-  isPro: false,
+  isPro: true,
   drawMode: false,
   activeTab: 'auto',
   freeRedactionsUsed: 0,
@@ -656,7 +644,6 @@ const deselectAllBtn = document.getElementById('deselectAllBtn');
 const settingsBtn = document.getElementById('settingsBtn');
 const settingsModal = document.getElementById('settingsModal');
 const closeSettings = document.getElementById('closeSettings');
-const activateBtn = document.getElementById('activateBtn');
 const drawModeBtn = document.getElementById('drawModeBtn');
 const heroSection = document.getElementById('heroSection');
 const limitNotice = document.getElementById('limitNotice');
@@ -679,7 +666,6 @@ fileInput.addEventListener('change', (e) => {
 errorResetBtn.addEventListener('click', resetApp);
 settingsBtn.addEventListener('click', () => settingsModal.classList.remove('hidden'));
 closeSettings.addEventListener('click', () => settingsModal.classList.add('hidden'));
-activateBtn.addEventListener('click', activateLicense);
 document.querySelectorAll('.open-settings').forEach(btn => {
   btn.addEventListener('click', () => settingsModal.classList.remove('hidden'));
 });
@@ -1774,3 +1760,4 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 </body>
 </html>
+
