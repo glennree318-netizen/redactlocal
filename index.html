@@ -17,6 +17,25 @@
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="RedactNook — 100% Local PII Redactor" />
 <meta name="twitter:description" content="Redact PII from PDFs and images, plus merge and split PDF — all client-side. No uploads, no accounts. Free." />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "RedactNook",
+  "url": "https://redactnook.vercel.app/",
+  "applicationCategory": "UtilitiesApplication",
+  "operatingSystem": "Any (web browser)",
+  "description": "Redact sensitive information (SSN, email, phone, credit cards) from PDFs and images, plus merge and split PDF. 100% client-side, no uploads, no accounts.",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "featureList": [
+    "Redact PII from PDF",
+    "Redact PII from images",
+    "Merge PDF",
+    "Split PDF",
+    "100% client-side processing"
+  ]
+}
+</script>
 
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -79,7 +98,7 @@
     <div class="flex items-center gap-3">
       <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">R</div>
       <div>
-        <h1 class="text-xl font-bold text-gray-900">RedactNook</h1>
+        <div class="text-xl font-bold text-gray-900">RedactNook</div>
         <p class="text-xs text-gray-500">Redact &middot; Merge &middot; Split — 100% Local</p>
       </div>
     </div>
